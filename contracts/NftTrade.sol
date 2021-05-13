@@ -12,12 +12,13 @@ contract UnknownUniqueArt is ERC721{
     
     mapping (string => uint8) hashes;
     mapping (uint256 => string) tokenIdtoMetadata;
+    mapping (uint256 => address) tokenToOwner;
+
     struct Offer {
         bool isforsale;
         uint256 minValue;
-        uint256 buyNow;
+        uint256 maxValue;
         address seller;
-        address onlySellto;
     }
 
     struct Bid {
@@ -29,21 +30,42 @@ contract UnknownUniqueArt is ERC721{
     mapping (uint256 => Offer) artForSale;
     mapping (uint256 => Bid) artBid;
 
-    constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {}
+    modifier isTokenOwner(uint256 _tokenId) {
+        require(tokenToOwner[_tokenId] == msg.sender);
+        _;
+    }
 
-    function _setTokenUri(uint256 _tokenId, string memory _metadata) internal {
+    constructor(string memory _name, string memory _symbol) 
+                ERC721(_name, _symbol) {}
+
+    function _setTokenUri(uint256 _tokenId, 
+                          string memory _metadata) internal {
         tokenIdtoMetadata[_tokenId] = _metadata;
     }
 
-    function _createAsset(address _recipient, string memory _hash, string memory _metadata) internal returns (uint256){
+    function _createAsset(address _recipient, 
+                          string memory _hash, 
+                          string memory _metadata) internal returns (uint256){
         require(hashes[_hash] != 1);
         hashes[_hash] = 1;
         tokenId.increment();
         uint256 artId = tokenId.current();
         _mint(_recipient, artId);
         _setTokenUri(artId, _metadata);
+        tokenToOwner[artId] = _recipient;
         return artId;
     }
 
-    // function listAsset(address _recipient, )
+    function listAsset(address _recipient,
+                       string memory _hash,
+                       string memory _metadata, 
+                       uint256 _minValue, 
+                       uint256 _maxValue) public returns (uint256){
+        uint256 _tokenId = _createAsset(_recipient, _hash, _metadata);
+        artForSale[_tokenId] = Offer(true, 
+                                     _minValue,
+                                     _maxValue, 
+                                     _recipient);
+        return _tokenId;
+    }
 }
