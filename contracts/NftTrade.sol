@@ -10,7 +10,7 @@ contract UnknownUniqueArt is ERC721{
     using Counters for Counters.Counter;
     Counters.Counter private tokenId;
     
-    mapping (string => uint8) hashes;
+    mapping (string => uint256) hashes;
     mapping (uint256 => string) tokenIdtoMetadata;
     mapping (uint256 => address) tokenToOwner;
 
@@ -46,12 +46,12 @@ contract UnknownUniqueArt is ERC721{
     function _createAsset(address _recipient, 
                           string memory _hash, 
                           string memory _metadata) internal returns (uint256){
-        require(hashes[_hash] != 1);
-        hashes[_hash] = 1;
+        require(hashes[_hash] == 0);
         tokenId.increment();
         uint256 artId = tokenId.current();
         _mint(_recipient, artId);
         _setTokenUri(artId, _metadata);
+        hashes[_hash] = artId;
         tokenToOwner[artId] = _recipient;
         return artId;
     }
@@ -72,17 +72,23 @@ contract UnknownUniqueArt is ERC721{
 
     function makeBid(address _bidder, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
-        require(askedItem.isForSale == true &&
-                askedItem.minValue <= value &&
-                askedItem.maxValue >= value);
+        require(askedItem.isForSale == true, "NFT not for sale");
+        require(askedItem.minValue <= value, "Bid less than minimum asking price");
+        require(askedItem.maxValue > value, "Bid less than maximum price");
         Bid memory itemBid = artBid[_tokenId];
         if (itemBid.hasbid) {
-            console.log(itemBid.value);
-            require(itemBid.value < value);
+            require(itemBid.value < value, "Higher bid already exist");
             artBid[_tokenId] = Bid(true, value, _bidder);
-            console.log(itemBid.value);
         }else {
             artBid[_tokenId] = Bid(true, value, _bidder);
         }
     }
+
+    function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
+        Offer memory askedItem = artForSale[_tokenId];
+        require (askedItem.isForSale == true, "NFT not for sale");
+        require (askedItem.maxValue == value, "Amount not equal Buy now");
+        tokenToOwner[_tokenId] = _buyer;
+    }
+
 }
