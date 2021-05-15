@@ -15,7 +15,7 @@ contract UnknownUniqueArt is ERC721{
     mapping (uint256 => address) tokenToOwner;
 
     struct Offer {
-        bool isforsale;
+        bool isForSale;
         uint256 minValue;
         uint256 maxValue;
         address seller;
@@ -60,12 +60,29 @@ contract UnknownUniqueArt is ERC721{
                        string memory _hash,
                        string memory _metadata, 
                        uint256 _minValue, 
-                       uint256 _maxValue) public returns (uint256){
+                       uint256 _maxValue) public returns (uint256) {
         uint256 _tokenId = _createAsset(_recipient, _hash, _metadata);
-        artForSale[_tokenId] = Offer(true, 
+        artForSale[_tokenId] = Offer(true,
                                      _minValue,
-                                     _maxValue, 
+                                     _maxValue,
                                      _recipient);
+        console.log(_tokenId);
         return _tokenId;
+    }
+
+    function makeBid(address _bidder, uint256 value, uint256 _tokenId) public {
+        Offer memory askedItem = artForSale[_tokenId];
+        require(askedItem.isForSale == true &&
+                askedItem.minValue <= value &&
+                askedItem.maxValue >= value);
+        Bid memory itemBid = artBid[_tokenId];
+        if (itemBid.hasbid) {
+            console.log(itemBid.value);
+            require(itemBid.value < value);
+            artBid[_tokenId] = Bid(true, value, _bidder);
+            console.log(itemBid.value);
+        }else {
+            artBid[_tokenId] = Bid(true, value, _bidder);
+        }
     }
 }

@@ -3,13 +3,25 @@ const { ethers } = require("hardhat");
 
 
 describe("UnknownUniqueArt", function(){
-    it("creates token", async function(){
+    let unknownUniqueArt;
+
+    beforeEach(async function(){
         const UnknownUniqueArt = await ethers.getContractFactory("UnknownUniqueArt");
-        const unknownUniqueArt = await UnknownUniqueArt.deploy("UnknownUniqueArt", "UUA");
+        unknownUniqueArt = await UnknownUniqueArt.deploy("UnknownUniqueArt", "UUA");
+        // deploy NFT contract
         await unknownUniqueArt.deployed();
         console.log("deployed at - ", unknownUniqueArt.address);
         
+    })
+
+    it("creates nft", async function(){
         const [owner, addr1, addr2] = await ethers.getSigners();
-        unknownUniqueArt.createAsset(addr2.address, 'abc', "https://abc");
+        const minAmount = ethers.utils.parseEther("0.01");
+        const maxAmount = ethers.utils.parseEther("0.05");
+        const tokenId = await unknownUniqueArt.listAsset(addr2.address, 
+                                                         'abc',
+                                                         "https://abc",
+                                                         minAmount,
+                                                         maxAmount);
     })
 })
