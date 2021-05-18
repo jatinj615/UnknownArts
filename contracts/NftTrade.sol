@@ -43,30 +43,45 @@ contract UnknownUniqueArt is ERC721{
         tokenIdtoMetadata[_tokenId] = _metadata;
     }
 
-    function _createAsset(address _recipient, 
+    function assetMinValue(uint256 _tokenId) public view returns (uint256) {
+        return artForSale[_tokenId].minValue;
+    }
+
+    function assetMaxValue(uint256 _tokenId) public view returns (uint256) {
+        return artForSale[_tokenId].maxValue;
+    }
+
+    function assetMetadata(uint256 _tokenId) public view returns (string memory) {
+        return tokenIdtoMetadata[_tokenId];
+    }
+
+    function assetCreator(uint256 _tokenId) public view returns (address) {
+        return tokenToOwner[_tokenId];
+    }
+
+    function _createAssetToken(address _creator, 
                           string memory _hash, 
                           string memory _metadata) internal returns (uint256){
-        require(hashes[_hash] == 0);
+        require(hashes[_hash] == 0, "Token with hash already created");
         tokenId.increment();
         uint256 artId = tokenId.current();
-        _mint(_recipient, artId);
+        _mint(_creator, artId);
         _setTokenUri(artId, _metadata);
         hashes[_hash] = artId;
-        tokenToOwner[artId] = _recipient;
+        tokenToOwner[artId] = _creator;
         return artId;
     }
 
-    function listAsset(address _recipient,
+    function createAsset(address _creator,
                        string memory _hash,
-                       string memory _metadata, 
+                       string memory _metadata,
                        uint256 _minValue, 
                        uint256 _maxValue) public returns (uint256) {
-        uint256 _tokenId = _createAsset(_recipient, _hash, _metadata);
+        uint256 _tokenId = _createAssetToken(_creator, _hash, _metadata);
         artForSale[_tokenId] = Offer(true,
                                      _minValue,
                                      _maxValue,
-                                     _recipient);
-        console.log(_tokenId);
+                                     _creator);
         return _tokenId;
     }
 
@@ -74,7 +89,7 @@ contract UnknownUniqueArt is ERC721{
         Offer memory askedItem = artForSale[_tokenId];
         require(askedItem.isForSale == true, "NFT not for sale");
         require(askedItem.minValue <= value, "Bid less than minimum asking price");
-        require(askedItem.maxValue > value, "Bid less than maximum price");
+        require(askedItem.maxValue > value, "Bid more than maximum price");
         Bid memory itemBid = artBid[_tokenId];
         if (itemBid.hasbid) {
             require(itemBid.value < value, "Higher bid already exist");
@@ -90,5 +105,6 @@ contract UnknownUniqueArt is ERC721{
         require (askedItem.maxValue == value, "Amount not equal Buy now");
         tokenToOwner[_tokenId] = _buyer;
     }
+
 
 }
