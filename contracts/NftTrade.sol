@@ -59,6 +59,14 @@ contract UnknownUniqueArt is ERC721{
         return tokenToOwner[_tokenId];
     }
 
+    function assetBidder(uint _tokenId) public view returns (address) {
+        return artBid[_tokenId].bidder;
+    }
+
+    function assetCurrentBid(uint _tokenId) public view returns (uint256) {
+        return artBid[_tokenId].value;
+    }
+
     function _createAssetToken(address _creator, 
                           string memory _hash, 
                           string memory _metadata) internal returns (uint256){
@@ -73,12 +81,13 @@ contract UnknownUniqueArt is ERC721{
     }
 
     function createAsset(address _creator,
-                       string memory _hash,
-                       string memory _metadata,
-                       uint256 _minValue, 
-                       uint256 _maxValue) public returns (uint256) {
+                         bool forSale,
+                         string memory _hash,
+                         string memory _metadata,
+                         uint256 _minValue, 
+                         uint256 _maxValue) public returns (uint256) {
         uint256 _tokenId = _createAssetToken(_creator, _hash, _metadata);
-        artForSale[_tokenId] = Offer(true,
+        artForSale[_tokenId] = Offer(forSale,
                                      _minValue,
                                      _maxValue,
                                      _creator);
@@ -88,11 +97,11 @@ contract UnknownUniqueArt is ERC721{
     function makeBid(address _bidder, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
         require(askedItem.isForSale == true, "NFT not for sale");
-        require(askedItem.minValue <= value, "Bid less than minimum asking price");
-        require(askedItem.maxValue > value, "Bid more than maximum price");
+        require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
+        require(askedItem.maxValue > value, "Bid cannot be more than maximum price");
         Bid memory itemBid = artBid[_tokenId];
         if (itemBid.hasbid) {
-            require(itemBid.value < value, "Higher bid already exist");
+            require(itemBid.value <= value, "Higher bid required");
             artBid[_tokenId] = Bid(true, value, _bidder);
         }else {
             artBid[_tokenId] = Bid(true, value, _bidder);
@@ -102,7 +111,7 @@ contract UnknownUniqueArt is ERC721{
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
         require (askedItem.isForSale == true, "NFT not for sale");
-        require (askedItem.maxValue == value, "Amount not equal Buy now");
+        require (askedItem.maxValue == value, "Amount not equal to Buy now");
         tokenToOwner[_tokenId] = _buyer;
     }
 
