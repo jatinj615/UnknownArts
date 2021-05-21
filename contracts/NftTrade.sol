@@ -60,7 +60,6 @@ contract UnknownUniqueArtExchange {
                                      _minValue,
                                      _maxValue,
                                      msg.sender);
-        nonFungibleContract.approve(address(this), _tokenId);
         nonFungibleContract.transferFrom(msg.sender, address(this), _tokenId);
     }
 
@@ -78,7 +77,12 @@ contract UnknownUniqueArtExchange {
         }
     }
 
-    // function acceptBid()
+    function acceptBid(uint256 _tokenId) public {
+        Offer memory ownerOffer = artForSale[_tokenId];
+        Bid memory currentBid = artBid[_tokenId];
+        require(msg.sender == ownerOffer.seller, "Not authorised");
+        nonFungibleContract.transferFrom(address(this), currentBid.bidder, _tokenId);
+    }
 
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
