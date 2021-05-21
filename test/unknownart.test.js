@@ -55,7 +55,7 @@ describe("UnknownUniqueArt", function(){
         const token_log = await token.wait();
         const tokenId = token_log.events[0].args.tokenId;
 
-        assert.equal(await unknownUniqueArt.assetCreator(tokenId), accounts[2].address);
+        assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[2].address);
         assert.equal(await unknownUniqueArt.assetMetadata(tokenId), token_metadata);
         assert.equal((await unknownUniqueArt.assetMinValue(tokenId)).toString(), minAmount.toString());
         assert.equal((await unknownUniqueArt.assetMaxValue(tokenId)).toString(), maxAmount.toString());
@@ -139,6 +139,13 @@ describe("UnknownUniqueArt", function(){
                                                 bidAmount,
                                                 tokenId)
         await assertRevert(lowerBid, "Higher bid required");
+    })
+
+    it("should buy the asset", async function(){
+        const token_log = await token.wait();
+        const tokenId = token_log.events[0].args.tokenId
+
+        const amount = maxAmount
     })
 
 })
