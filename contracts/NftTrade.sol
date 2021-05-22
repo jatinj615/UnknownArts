@@ -9,6 +9,8 @@ contract UnknownUniqueArtExchange {
 
     ERC721 public nonFungibleContract;
 
+    // Cut owner takes on each auction, measured in basis points (1/100 of a percent).
+    // Values 0-10,000 map to 0%-10%
     uint256 public ownerCut;
 
     struct Offer {
@@ -27,14 +29,19 @@ contract UnknownUniqueArtExchange {
     mapping (uint256 => Offer) artForSale;
     mapping (uint256 => Bid) artBid;
 
-    constructor(address _nftAddress, uint256 _cut) {
-        nonFungibleContract = ERC721(_nftAddress);
+    constructor(uint256 _cut) {
+        require(_cut <= 1000, "Cut percentage should not exceed 10");
         ownerCut = _cut;
     }
 
-    modifier isTokenOwner(address _seller, uint256 _tokenId) {
+    modifier isTokenOwner(address _nftAddress, address _seller, uint256 _tokenId) {
+        nonFungibleContract = ERC721(_nftAddress);
         require(nonFungibleContract.ownerOf(_tokenId) == _seller, "Not the owner of token");
         _;
+    }
+
+    function assetForSale(uint256 _tokenId) public view returns (bool) {
+        return artForSale[_tokenId].isForSale;
     }
 
     function assetMinValue(uint256 _tokenId) public view returns (uint256) {
@@ -53,9 +60,10 @@ contract UnknownUniqueArtExchange {
         return artBid[_tokenId].value;
     }
 
-    function listAsset(uint256 _tokenId,
+    function listAsset(address _nftAddress,
+                       uint256 _tokenId,
                        uint256 _minValue,
-                       uint256 _maxValue) isTokenOwner(msg.sender, _tokenId) public{
+                       uint256 _maxValue) isTokenOwner(_nftAddress, msg.sender, _tokenId) public{
         artForSale[_tokenId] = Offer(true,
                                      _minValue,
                                      _maxValue,
@@ -63,7 +71,8 @@ contract UnknownUniqueArtExchange {
         nonFungibleContract.transferFrom(msg.sender, address(this), _tokenId);
     }
 
-    function makeBid(address _bidder, uint256 value, uint256 _tokenId) public {
+    function makeBid(address _nftAddress, address _bidder, uint256 value, uint256 _tokenId) public {
+        nonFungibleContract = ERC721(_nftAddress);
         Offer memory askedItem = artForSale[_tokenId];
         require(askedItem.isForSale == true, "NFT not for sale");
         require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
@@ -77,7 +86,8 @@ contract UnknownUniqueArtExchange {
         }
     }
 
-    function acceptBid(uint256 _tokenId) public {
+    function acceptBid(address _nftAddress, uint256 _tokenId) public {
+        nonFungibleContract = ERC721(_nftAddress);
         Offer memory ownerOffer = artForSale[_tokenId];
         Bid memory currentBid = artBid[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
