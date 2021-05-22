@@ -90,6 +90,7 @@ describe("UnknownUniqueArt", function(){
         await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
 
         await unknownUniqueArtExchange.connect(accounts[2]).listAsset(nftAddress,
+                                                                      forSale,
                                                                       tokenId,
                                                                       minAmount,
                                                                       maxAmount)
@@ -114,27 +115,37 @@ describe("UnknownUniqueArt", function(){
         assert.equal((await unknownUniqueArtExchange.assetCurrentBid(tokenId)).toString(), bidAmount.toString());
     })
 
-    // it("should make bid on not for sale asset", async function(){
-    //     const forSale = false;
-    //     const newToken = await unknownUniqueArt.createAsset(accounts[2].address, 
-    //                                                       forSale,
-    //                                                       "xyz",
-    //                                                       "https://xyz",
-    //                                                       minAmount,
-    //                                                       maxAmount);
+    it("should make bid on not for sale asset", async function(){
+
+        // create new token 
+        const newToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
+                                                                "xyz",
+                                                                "https://xyz");
+                                                                
+        // fetch token id from events data
+        const token_log = await newToken.wait();
+        const tokenId = token_log.events[0].args.tokenId;
         
-    //     // fetch token id from events data
-    //     const token_log = await newToken.wait();
-    //     const tokenId = token_log.events[0].args.tokenId;
+        // list asset token to exchange
+        const forSale = false;
+        await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
         
-    //     const bidAmount = ethers.utils.parseEther("0.02");
-    //     const newBid = unknownUniqueArt.makeBid(accounts[3].address,
-    //                                             bidAmount,
-    //                                             tokenId);
+        await unknownUniqueArtExchange.connect(accounts[2]).listAsset(nftAddress,
+                                                                      forSale,
+                                                                      tokenId,
+                                                                      minAmount,
+                                                                      maxAmount)
+
+        // make bid on not for sale token
+        const bidAmount = ethers.utils.parseEther("0.02");
+        const newBid = unknownUniqueArtExchange.makeBid(nftExchangeAddress, 
+                                                        accounts[3].address,
+                                                        bidAmount,
+                                                        tokenId);
         
-    //     await assertRevert(newBid, "NFT not for sale");
+        await assertRevert(newBid, "NFT not for sale");
         
-    // })
+    })
 
     it("should try to bid lower than minimum value", async function(){
         const token_log = await token.wait();

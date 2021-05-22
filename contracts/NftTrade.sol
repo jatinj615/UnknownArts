@@ -61,10 +61,11 @@ contract UnknownUniqueArtExchange {
     }
 
     function listAsset(address _nftAddress,
+                       bool _forSale,
                        uint256 _tokenId,
                        uint256 _minValue,
                        uint256 _maxValue) isTokenOwner(_nftAddress, msg.sender, _tokenId) public{
-        artForSale[_tokenId] = Offer(true,
+        artForSale[_tokenId] = Offer(_forSale,
                                      _minValue,
                                      _maxValue,
                                      msg.sender);
