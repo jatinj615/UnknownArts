@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721Transfer} from "./ERC721Transfer.sol";
 import {UnknownUniqueArt} from "./NftCreator.sol";
 import "hardhat/console.sol";
 
 
 contract UnknownUniqueArtExchange {
 
-    ERC721 public nonFungibleContract;
+    ERC721Transfer public nonFungibleContract;
 
     // Cut owner takes on each auction, measured in basis points (1/100 of a percent).
     // Values 0-10,000 map to 0%-10%
@@ -35,7 +35,7 @@ contract UnknownUniqueArtExchange {
     }
 
     modifier isTokenOwner(address _nftAddress, address _seller, uint256 _tokenId) {
-        nonFungibleContract = ERC721(_nftAddress);
+        nonFungibleContract = ERC721Transfer(_nftAddress);
         require(nonFungibleContract.ownerOf(_tokenId) == _seller, "Not the owner of token");
         _;
     }
@@ -72,7 +72,7 @@ contract UnknownUniqueArtExchange {
     }
 
     function makeBid(address _nftAddress, address _bidder, uint256 value, uint256 _tokenId) public {
-        nonFungibleContract = ERC721(_nftAddress);
+        nonFungibleContract = ERC721Transfer(_nftAddress);
         Offer memory askedItem = artForSale[_tokenId];
         require(askedItem.isForSale == true, "NFT not for sale");
         require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
@@ -87,18 +87,18 @@ contract UnknownUniqueArtExchange {
     }
 
     function acceptBid(address _nftAddress, uint256 _tokenId) public {
-        nonFungibleContract = ERC721(_nftAddress);
+        nonFungibleContract = ERC721Transfer(_nftAddress);
         Offer memory ownerOffer = artForSale[_tokenId];
         Bid memory currentBid = artBid[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
-        nonFungibleContract.transferFrom(address(this), currentBid.bidder, _tokenId);
+        nonFungibleContract.transfer(address(this), currentBid.bidder, _tokenId);
     }
 
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
         require (askedItem.isForSale == true, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to Buy now");
-        nonFungibleContract.transferFrom(address(this), _buyer, _tokenId);
+        nonFungibleContract.transfer(address(this), _buyer, _tokenId);
     }
 
 
