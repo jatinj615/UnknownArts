@@ -1,5 +1,6 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC721Transfer} from "./ERC721Transfer.sol";
 import {UnknownUniqueArt} from "./NftCreator.sol";
 import "hardhat/console.sol";
@@ -12,6 +13,9 @@ contract UnknownUniqueArtExchange {
     // Cut owner takes on each auction, measured in basis points (1/100 of a percent).
     // Values 0-10,000 map to 0%-10%
     uint256 public ownerCut;
+
+    address daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    IERC20 dai = IERC20(daiAddress);
 
     struct Offer {
         bool isForSale;
@@ -81,10 +85,12 @@ contract UnknownUniqueArtExchange {
         Bid memory itemBid = artBid[_tokenId];
         if (itemBid.hasbid) {
             require(itemBid.value <= value, "Higher bid required");
+            dai.transfer(itemBid.bidder, itemBid.value);
             artBid[_tokenId] = Bid(true, value, _bidder);
         }else {
             artBid[_tokenId] = Bid(true, value, _bidder);
         }
+        dai.transferFrom(_bidder, address(this), value);
     }
 
     function acceptBid(address _nftAddress, uint256 _tokenId) public {
@@ -92,7 +98,9 @@ contract UnknownUniqueArtExchange {
         Offer memory ownerOffer = artForSale[_tokenId];
         Bid memory currentBid = artBid[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
+        dai.transfer(ownerOffer.seller, currentBid.value);
         nonFungibleContract.transfer(address(this), currentBid.bidder, _tokenId);
+
     }
 
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
@@ -100,6 +108,7 @@ contract UnknownUniqueArtExchange {
         require (askedItem.isForSale == true, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
         // return amount to current bidder
+        dai.transferFrom(_buyer, askedItem.seller, value);
         delete artForSale[_tokenId];
         delete artBid[_tokenId];
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
