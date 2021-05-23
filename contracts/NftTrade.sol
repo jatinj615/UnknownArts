@@ -98,7 +98,10 @@ contract UnknownUniqueArtExchange {
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
         require (askedItem.isForSale == true, "NFT not for sale");
-        require (askedItem.maxValue == value, "Amount not equal to Buy now");
+        require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
+        // return amount to current bidder
+        delete artForSale[_tokenId];
+        delete artBid[_tokenId];
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
     }
 

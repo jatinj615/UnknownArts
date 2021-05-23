@@ -26,6 +26,7 @@ describe("UnknownUniqueArt", function(){
     let unknownUniqueArtExchange;
     let accounts = [];
     let token;
+    let notForsaleToken;
     let ownerCut;
     let tokenHash;
     let minAmount;
@@ -61,8 +62,8 @@ describe("UnknownUniqueArt", function(){
                                                    tokenHash,
                                                    tokenMetadata);
         // fetch token Id from events data
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId;
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
 
         assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[2].address);
         assert.equal(await unknownUniqueArt.assetMetadata(tokenId), tokenMetadata);
@@ -80,8 +81,8 @@ describe("UnknownUniqueArt", function(){
         minAmount = ethers.utils.parseEther("0.01");
         maxAmount = ethers.utils.parseEther("0.05");
         // fetch token Id from events data
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId;
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
         
         // nft contract
         nft = new ethers.Contract(nftAddress,ERC271Artifact.abi, owner);
@@ -102,8 +103,8 @@ describe("UnknownUniqueArt", function(){
 
     it("should bid on the asset and test bid data", async function(){
         // fetch token Id from events data
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.02");
         await unknownUniqueArtExchange.makeBid(nftAddress,
@@ -118,13 +119,13 @@ describe("UnknownUniqueArt", function(){
     it("should make bid on not for sale asset", async function(){
 
         // create new token 
-        const newToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
+        notForsaleToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
                                                                 "xyz",
                                                                 "https://xyz");
                                                                 
         // fetch token id from events data
-        const token_log = await newToken.wait();
-        const tokenId = token_log.events[0].args.tokenId;
+        const tokenLog = await notForsaleToken.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
         
         // list asset token to exchange
         const forSale = false;
@@ -148,8 +149,8 @@ describe("UnknownUniqueArt", function(){
     })
 
     it("should try to bid lower than minimum value", async function(){
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.005");
         const lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
@@ -160,8 +161,8 @@ describe("UnknownUniqueArt", function(){
     })
 
     it("should try to bid more than maximum value", async function(){
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.06");
         const lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
@@ -172,8 +173,8 @@ describe("UnknownUniqueArt", function(){
     })
 
     it("should bid lower than current bid", async function(){
-        const token_log = await token.wait();
-        const tokenId = token_log.events[0].args.tokenId
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.015");
         let lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
@@ -183,11 +184,44 @@ describe("UnknownUniqueArt", function(){
         await assertRevert(lowerBid, "Higher bid required");
     })
 
-    // it("should buy the asset", async function(){
-    //     const token_log = await token.wait();
-    //     const tokenId = token_log.events[0].args.tokenId
+    
+    it("should try to buy asset not for sale", async function(){
+        // fetch token id from events data
+        const tokenLog = await notForsaleToken.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
+        
+        const amount = maxAmount
+        
+        const buyAsset = unknownUniqueArtExchange.buyNow(accounts[4].address,
+                                                         amount,
+                                                         tokenId)
+            
+            await assertRevert(buyAsset, "NFT not for sale");
+        })
+        
+    it("should try to buy token with amount different than maximun asking price", async function(){
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
+        
+        const amount = ethers.utils.parseEther("0.06")
+        
+        const buyAsset = unknownUniqueArtExchange.buyNow(accounts[4].address,
+                                                         amount,
+                                                         tokenId)
+                  
+        await assertRevert(buyAsset, "Amount not equal to maximun asking price");
+    })
+    
+    it("should buy the asset and test for new owner", async function(){
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
 
-    //     const amount = maxAmount
-    // })
+        const amount = maxAmount
 
+        await unknownUniqueArtExchange.buyNow(accounts[4].address,
+                                              amount,
+                                              tokenId)
+        
+        assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[4].address);
+    })
 })
