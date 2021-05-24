@@ -100,7 +100,6 @@ contract UnknownUniqueArtExchange {
         require(msg.sender == ownerOffer.seller, "Not authorised");
         dai.transfer(ownerOffer.seller, currentBid.value);
         nonFungibleContract.transfer(address(this), currentBid.bidder, _tokenId);
-
     }
 
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {

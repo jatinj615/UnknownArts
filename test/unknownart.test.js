@@ -1,6 +1,7 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 const ERC271Artifact = require('@openzeppelin/contracts/build/contracts/ERC721.json');
+const IERC20Artifact = require('@openzeppelin/contracts/build/contracts/IERC20.json');
 
 async function assertRevert(promise, errorMessage = null) {
     try {
@@ -22,20 +23,21 @@ async function assertRevert(promise, errorMessage = null) {
   
 
 describe("UnknownUniqueArt", function(){
-    let unknownUniqueArt;
-    let unknownUniqueArtExchange;
-    let accounts = [];
-    let token;
-    let notForsaleToken;
-    let ownerCut;
-    let tokenHash;
-    let minAmount;
-    let maxAmount;
-    let tokenMetadata;
-    let nft;
-    let nftAddress;
-    let nftExchangeAddress;
-    let owner;
+    let unknownUniqueArt,
+        unknownUniqueArtExchange,
+        token, notForSaleToken,
+        ownerCut,
+        tokenHash,
+        minAmount,
+        maxAmount,
+        tokenMetadata,
+        nft,
+        dai,
+        nftAddress,
+        nftExchangeAddress,
+        owner,
+        signer,
+        accounts = [];
 
     before(async function(){
         const UnknownUniqueArt = await ethers.getContractFactory("UnknownUniqueArt");
@@ -50,11 +52,28 @@ describe("UnknownUniqueArt", function(){
         unknownUniqueArtExchange = await UnknownUniqueArtExchange.deploy(ownerCut)
         await unknownUniqueArtExchange.deployed();
         nftExchangeAddress = unknownUniqueArtExchange.address;
+
+        // dai connection for impersonate account
+        const ierc20Abi = IERC20Artifact.abi;
+        const impersonateAccount = "0x9e033f4d440c4e387ed87759cb4436c7a95c45a3"
+        const daiAddress = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+        const provider = ethers.getDefaultProvider();
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: ["0x9e033f4d440c4e387ed87759cb4436c7a95c45a3"]
+        })
+        signer = ethers.provider.getSigner(impersonateAccount);
+        dai = new ethers.Contract(daiAddress, ierc20Abi, signer);
+        // devide balance into different accounts
+        accounts = await ethers.getSigners();
+        owner = accounts[0];
+        const balanceAmount = ethers.utils.parseEther("10");
+        for(i=0; i<=5; i++) {
+            dai.connect(signer).transfer(accounts[i].address, balanceAmount);
+        };
     })
 
     it("should test create asset for user and test asset data", async function(){
-        accounts = await ethers.getSigners();
-        owner = accounts[0];
         tokenHash = 'abc';
         tokenMetadata = 'https://abc';
         const forSale = true
@@ -107,6 +126,9 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.02");
+        
+        // approve contract for the bid amount
+        await dai.connect(accounts[3]).approve(unknownUniqueArtExchange.address, bidAmount);
         await unknownUniqueArtExchange.makeBid(nftAddress,
                                                accounts[3].address,
                                                bidAmount,
@@ -119,12 +141,12 @@ describe("UnknownUniqueArt", function(){
     it("should make bid on not for sale asset", async function(){
 
         // create new token 
-        notForsaleToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
+        notForSaleToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
                                                                 "xyz",
                                                                 "https://xyz");
                                                                 
         // fetch token id from events data
-        const tokenLog = await notForsaleToken.wait();
+        const tokenLog = await notForSaleToken.wait();
         const tokenId = tokenLog.events[0].args.tokenId;
         
         // list asset token to exchange
@@ -139,6 +161,9 @@ describe("UnknownUniqueArt", function(){
 
         // make bid on not for sale token
         const bidAmount = ethers.utils.parseEther("0.02");
+        // approve contract for the bid amount
+        await dai.connect(accounts[3]).approve(unknownUniqueArtExchange.address, bidAmount);
+
         const newBid = unknownUniqueArtExchange.makeBid(nftExchangeAddress, 
                                                         accounts[3].address,
                                                         bidAmount,
@@ -153,6 +178,9 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.005");
+
+        // approve contract for the bid amount
+        await dai.connect(accounts[1]).approve(unknownUniqueArtExchange.address, bidAmount);
         const lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
                                                           accounts[1].address,
                                                           bidAmount,
@@ -165,6 +193,9 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.06");
+
+        // approve contract for the bid amount
+        await dai.connect(accounts[1]).approve(unknownUniqueArtExchange.address, bidAmount);
         const lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
                                                           accounts[1].address,
                                                           bidAmount,
@@ -177,6 +208,10 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
         
         const bidAmount = ethers.utils.parseEther("0.015");
+
+        // approve contract for the bid amount
+        await dai.connect(accounts[1]).approve(unknownUniqueArtExchange.address, bidAmount);
+
         let lowerBid = unknownUniqueArtExchange.makeBid(nftAddress,
                                                         accounts[1].address,
                                                         bidAmount,
@@ -187,11 +222,14 @@ describe("UnknownUniqueArt", function(){
     
     it("should try to buy asset not for sale", async function(){
         // fetch token id from events data
-        const tokenLog = await notForsaleToken.wait();
+        const tokenLog = await notForSaleToken.wait();
         const tokenId = tokenLog.events[0].args.tokenId;
         
         const amount = maxAmount
         
+        // approve contract for the buy amount
+        await dai.connect(accounts[4]).approve(unknownUniqueArtExchange.address, amount);
+
         const buyAsset = unknownUniqueArtExchange.buyNow(accounts[4].address,
                                                          amount,
                                                          tokenId)
@@ -204,6 +242,9 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
         
         const amount = ethers.utils.parseEther("0.06")
+
+        // approve contract for the buy amount
+        await dai.connect(accounts[4]).approve(unknownUniqueArtExchange.address, amount);
         
         const buyAsset = unknownUniqueArtExchange.buyNow(accounts[4].address,
                                                          amount,
@@ -217,6 +258,9 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId
 
         const amount = maxAmount
+
+        // approve contract for the buy amount
+        await dai.connect(accounts[4]).approve(unknownUniqueArtExchange.address, amount);
 
         await unknownUniqueArtExchange.buyNow(accounts[4].address,
                                               amount,
