@@ -41,10 +41,10 @@ describe("UnknownUniqueArt", function(){
     async function createAsset(creator, hash, metadata) {
         tokenHash = hash;
         tokenMetadata = metadata;
-        token = await unknownUniqueArt.createAssetToken(creator,
+        createdToken = await unknownUniqueArt.createAssetToken(creator,
                                                         tokenHash,
                                                         tokenMetadata);
-        return token
+        return createdToken
     }
 
     async function listAsset(creator, tokenId, forSale, minAmount, maxAmount) {
@@ -94,9 +94,8 @@ describe("UnknownUniqueArt", function(){
     })
 
     it("should test create asset for user and test asset data", async function(){
-        tokenHash = 'abc';
-        tokenMetadata = 'https://abc';
-        const forSale = true
+        tokenHash = 'unique1';
+        tokenMetadata = 'https://unique1';
         token = await createAsset(accounts[2].address, tokenHash, tokenMetadata)
         
         // fetch token Id from events data
@@ -146,7 +145,7 @@ describe("UnknownUniqueArt", function(){
                                                accounts[3].address,
                                                bidAmount,
                                                tokenId);
-        
+
         assert.equal(await unknownUniqueArtExchange.assetBidder(tokenId), accounts[3].address);
         assert.equal((await unknownUniqueArtExchange.assetCurrentBid(tokenId)).toString(), bidAmount.toString());
     })
@@ -154,9 +153,9 @@ describe("UnknownUniqueArt", function(){
     it("should make bid on not for sale asset", async function(){
 
         // create new token 
-        notForSaleToken = await unknownUniqueArt.createAssetToken(accounts[2].address, 
-                                                                "xyz",
-                                                                "https://xyz");
+        notForSaleToken = await createAsset(accounts[2].address, 
+                                            "unique2",
+                                            "https://unique2");
                                                                 
         // fetch token id from events data
         const tokenLog = await notForSaleToken.wait();
@@ -166,11 +165,7 @@ describe("UnknownUniqueArt", function(){
         const forSale = false;
         await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
         
-        await unknownUniqueArtExchange.connect(accounts[2]).listAsset(nftAddress,
-                                                                      forSale,
-                                                                      tokenId,
-                                                                      minAmount,
-                                                                      maxAmount)
+        await listAsset(accounts[2], tokenId, forSale, minAmount, maxAmount)
 
         // make bid on not for sale token
         const bidAmount = ethers.utils.parseEther("0.02");
@@ -198,6 +193,7 @@ describe("UnknownUniqueArt", function(){
                                                           accounts[1].address,
                                                           bidAmount,
                                                           tokenId)
+        
         await assertRevert(lowerBid, "Bid cannot be less than minimum asking price");
     })
 
@@ -293,9 +289,18 @@ describe("UnknownUniqueArt", function(){
     })
 
     it("should try to accept bid on NFT with no bids", async function(){
+        // create and list new NFT token
+        tokenHash = 'unique3';
+        tokenMetadata = 'https://unique3';
+        const forSale = true;
+        token = await createAsset(accounts[2].address, tokenHash, tokenMetadata)
+        // fetch tokenId from events data
         const tokenLog = await token.wait();
         const tokenId = tokenLog.events[0].args.tokenId
-        
+        // list created token
+        await listAsset(accounts[2], tokenId, forSale, minAmount, maxAmount)
+
+        // accept bid
         const accepting = unknownUniqueArtExchange.connect(accounts[2]).acceptBid(unknownUniqueArt.address,
                                                                                   tokenId)
         await assertRevert(accepting, "NFT does not have any active bid");
@@ -313,12 +318,20 @@ describe("UnknownUniqueArt", function(){
     it("should accept current bid and test new owner", async function(){
         const tokenLog = await token.wait();
         const tokenId = tokenLog.events[0].args.tokenId
+
+        // bid on the created token
+        const bidAmount = ethers.utils.parseEther("0.02");
         
-        const currentBidder = await unknownUniqueArtExchange.assetBidder(tokenId);
+        // approve contract for the bid amount
+        await dai.connect(accounts[3]).approve(unknownUniqueArtExchange.address, bidAmount);
+        await unknownUniqueArtExchange.makeBid(nftAddress,
+                                               accounts[3].address,
+                                               bidAmount,
+                                               tokenId);
 
         await unknownUniqueArtExchange.connect(accounts[2]).acceptBid(unknownUniqueArt.address,
                                                                       tokenId)
         
-        assert.equal(await unknownUniqueArt.ownerOf(tokenId), currentBidder);
+        assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[3].address);
     })
 })
