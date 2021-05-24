@@ -20,7 +20,6 @@ async function assertRevert(promise, errorMessage = null) {
     }
     assert.ok(false, 'Error containing "revert" must be returned');
 }
-  
 
 describe("UnknownUniqueArt", function(){
     let unknownUniqueArt,
@@ -38,6 +37,27 @@ describe("UnknownUniqueArt", function(){
         owner,
         signer,
         accounts = [];
+    
+    async function createAsset(creator, hash, metadata) {
+        tokenHash = hash;
+        tokenMetadata = metadata;
+        token = await unknownUniqueArt.createAssetToken(creator,
+                                                        tokenHash,
+                                                        tokenMetadata);
+        return token
+    }
+
+    async function listAsset(creator, tokenId, forSale, minAmount, maxAmount) {
+        // approve exhange token contract for escrow
+        await nft.connect(creator).approve(nftExchangeAddress, tokenId);
+
+        await unknownUniqueArtExchange.connect(creator).listAsset(nftAddress,
+                                                                  forSale,
+                                                                  tokenId,
+                                                                  minAmount,
+                                                                  maxAmount)
+        
+    }
 
     before(async function(){
         const UnknownUniqueArt = await ethers.getContractFactory("UnknownUniqueArt");
@@ -77,9 +97,8 @@ describe("UnknownUniqueArt", function(){
         tokenHash = 'abc';
         tokenMetadata = 'https://abc';
         const forSale = true
-        token = await unknownUniqueArt.createAssetToken(accounts[2].address,
-                                                   tokenHash,
-                                                   tokenMetadata);
+        token = await createAsset(accounts[2].address, tokenHash, tokenMetadata)
+        
         // fetch token Id from events data
         const tokenLog = await token.wait();
         const tokenId = tokenLog.events[0].args.tokenId;
@@ -106,14 +125,8 @@ describe("UnknownUniqueArt", function(){
         // nft contract
         nft = new ethers.Contract(nftAddress,ERC271Artifact.abi, owner);
 
-        // approve exhange token contract for escrow
-        await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
-
-        await unknownUniqueArtExchange.connect(accounts[2]).listAsset(nftAddress,
-                                                                      forSale,
-                                                                      tokenId,
-                                                                      minAmount,
-                                                                      maxAmount)
+        // list asset to exchange
+        await listAsset(accounts[2], tokenId, forSale, minAmount, maxAmount);
         
         assert.equal(await unknownUniqueArtExchange.assetForSale(tokenId), forSale);
         assert.equal((await unknownUniqueArtExchange.assetMinValue(tokenId)).toString(), minAmount.toString());
@@ -218,7 +231,6 @@ describe("UnknownUniqueArt", function(){
                                                         tokenId)
         await assertRevert(lowerBid, "Higher bid required");
     })
-
     
     it("should try to buy asset not for sale", async function(){
         // fetch token id from events data
@@ -234,8 +246,8 @@ describe("UnknownUniqueArt", function(){
                                                          amount,
                                                          tokenId)
             
-            await assertRevert(buyAsset, "NFT not for sale");
-        })
+        await assertRevert(buyAsset, "NFT not for sale");
+    })
         
     it("should try to buy token with amount different than maximun asking price", async function(){
         const tokenLog = await token.wait();
@@ -267,5 +279,46 @@ describe("UnknownUniqueArt", function(){
                                               tokenId)
         
         assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[4].address);
+    })
+
+    it("should try to accept bid on not for sale NFT", async function(){
+        // fetch token id from events data
+        const tokenLog = await notForSaleToken.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
+
+        const accepting = unknownUniqueArtExchange.connect(accounts[2]).acceptBid(unknownUniqueArt.address,
+                                                                                  tokenId)
+        
+        await assertRevert(accepting, "NFT not for sale");
+    })
+
+    it("should try to accept bid on NFT with no bids", async function(){
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
+        
+        const accepting = unknownUniqueArtExchange.connect(accounts[2]).acceptBid(unknownUniqueArt.address,
+                                                                                  tokenId)
+        await assertRevert(accepting, "NFT does not have any active bid");
+    })
+
+    it("should try to accept bid on NFT with non authorised user", async function(){
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
+        
+        const accepting = unknownUniqueArtExchange.connect(accounts[5]).acceptBid(unknownUniqueArt.address,
+                                                                                  tokenId)
+        await assertRevert(accepting, "NFT does not have any active bid");
+    })
+    
+    it("should accept current bid and test new owner", async function(){
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId
+        
+        const currentBidder = await unknownUniqueArtExchange.assetBidder(tokenId);
+
+        await unknownUniqueArtExchange.connect(accounts[2]).acceptBid(unknownUniqueArt.address,
+                                                                      tokenId)
+        
+        assert.equal(await unknownUniqueArt.ownerOf(tokenId), currentBidder);
     })
 })

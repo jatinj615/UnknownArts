@@ -79,7 +79,7 @@ contract UnknownUniqueArtExchange {
     function makeBid(address _nftAddress, address _bidder, uint256 value, uint256 _tokenId) public {
         nonFungibleContract = ERC721Transfer(_nftAddress);
         Offer memory askedItem = artForSale[_tokenId];
-        require(askedItem.isForSale == true, "NFT not for sale");
+        require(askedItem.isForSale, "NFT not for sale");
         require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
         require(askedItem.maxValue > value, "Bid cannot be more than maximum price");
         Bid memory itemBid = artBid[_tokenId];
@@ -94,23 +94,27 @@ contract UnknownUniqueArtExchange {
     }
 
     function acceptBid(address _nftAddress, uint256 _tokenId) public {
-        nonFungibleContract = ERC721Transfer(_nftAddress);
         Offer memory ownerOffer = artForSale[_tokenId];
+        require(ownerOffer.isForSale, "NFT not for sale");
         Bid memory currentBid = artBid[_tokenId];
+        require(currentBid.hasbid, "NFT does not have any active bid");
+        nonFungibleContract = ERC721Transfer(_nftAddress);
         require(msg.sender == ownerOffer.seller, "Not authorised");
         dai.transfer(ownerOffer.seller, currentBid.value);
         nonFungibleContract.transfer(address(this), currentBid.bidder, _tokenId);
+        delete artForSale[_tokenId];
+        delete artBid[_tokenId];
     }
 
     function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
         Offer memory askedItem = artForSale[_tokenId];
-        require (askedItem.isForSale == true, "NFT not for sale");
+        require (askedItem.isForSale, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
         // return amount to current bidder
         dai.transferFrom(_buyer, askedItem.seller, value);
+        nonFungibleContract.transfer(address(this), _buyer, _tokenId);
         delete artForSale[_tokenId];
         delete artBid[_tokenId];
-        nonFungibleContract.transfer(address(this), _buyer, _tokenId);
     }
 
 
