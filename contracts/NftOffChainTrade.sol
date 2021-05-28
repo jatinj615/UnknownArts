@@ -1,11 +1,10 @@
-//SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeMath } from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {ERC721Transfer} from "./ERC721Transfer.sol";
 import {UnknownUniqueArt} from "./NftCreator.sol";
 import "hardhat/console.sol";
-
 
 contract UnknownUniqueArtExchange {
 
@@ -27,14 +26,14 @@ contract UnknownUniqueArtExchange {
         address seller;
     }
 
-    struct Bid {
-        bool hasbid;
-        uint256 value;
-        address bidder;
-    }
+    // struct Bid {
+    //     bool hasbid;
+    //     uint256 value;
+    //     address bidder;
+    // }
     
     mapping (uint256 => Offer) artForSale;
-    mapping (uint256 => Bid) artBid;
+    // mapping (uint256 => Bid) artBid;
 
     constructor(uint256 _cut) {
         require(_cut <= 1000, "Cut percentage should not exceed 10");
@@ -59,16 +58,16 @@ contract UnknownUniqueArtExchange {
         return artForSale[_tokenId].maxValue;
     }
 
-    function assetBidder(uint _tokenId) public view returns (address) {
-        return artBid[_tokenId].bidder;
-    }
+    // function assetBidder(uint _tokenId) public view returns (address) {
+    //     return artBid[_tokenId].bidder;
+    // }
 
-    function assetCurrentBid(uint _tokenId) public view returns (uint256) {
-        return artBid[_tokenId].value;
-    }
+    // function assetCurrentBid(uint _tokenId) public view returns (uint256) {
+    //     return artBid[_tokenId].value;
+    // }
 
-    function afterOwnerCut(uint256 value) public view returns (uint256) {
-        return value.sub(value.mul(ownerCut.div(10000)));
+    function calculateOwnerCut(uint256 value) public view returns (uint256) {
+        return value.mul(ownerCut.div(10000));
     }
 
     function listAsset(address _nftAddress,
@@ -83,33 +82,39 @@ contract UnknownUniqueArtExchange {
         nonFungibleContract.transferFrom(msg.sender, address(this), _tokenId);
     }
 
-    function makeBid(address _nftAddress, address _bidder, uint256 value, uint256 _tokenId) public {
-        nonFungibleContract = ERC721Transfer(_nftAddress);
-        Offer memory askedItem = artForSale[_tokenId];
-        require(askedItem.isForSale, "NFT not for sale");
-        require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
-        require(askedItem.maxValue > value, "Bid cannot be more than maximum price");
-        Bid memory itemBid = artBid[_tokenId];
-        if (itemBid.hasbid) {
-            require(itemBid.value <= value, "Higher bid required");
-            dai.transfer(itemBid.bidder, itemBid.value);
-            artBid[_tokenId] = Bid(true, value, _bidder);
-        }else {
-            artBid[_tokenId] = Bid(true, value, _bidder);
-        }
-        dai.transferFrom(_bidder, address(this), value);
-    }
+    // function makeBid(address _nftAddress, address _bidder, uint256 value, uint256 _tokenId) public {
+    //     nonFungibleContract = ERC721Transfer(_nftAddress);
+    //     Offer memory askedItem = artForSale[_tokenId];
+    //     require(askedItem.isForSale, "NFT not for sale");
+    //     require(askedItem.minValue <= value, "Bid cannot be less than minimum asking price");
+    //     require(askedItem.maxValue > value, "Bid cannot be more than maximum price");
+    //     Bid memory itemBid = artBid[_tokenId];
+    //     if (itemBid.hasbid) {
+    //         require(itemBid.value <= value, "Higher bid required");
+    //         dai.transfer(itemBid.bidder, itemBid.value);
+    //         artBid[_tokenId] = Bid(true, value, _bidder);
+    //     }else {
+    //         artBid[_tokenId] = Bid(true, value, _bidder);
+    //     }
+    //     dai.transferFrom(_bidder, address(this), value);
+    // }
 
-    function acceptBid(address _nftAddress, uint256 _tokenId) public {
+    function acceptBid(
+        address _nftAddress,
+        address _bidder, 
+        uint256 value, 
+        uint256 _tokenId,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public {
+        
         Offer memory ownerOffer = artForSale[_tokenId];
         require(ownerOffer.isForSale, "NFT not for sale");
-        Bid memory currentBid = artBid[_tokenId];
-        require(currentBid.hasbid, "NFT does not have any active bid");
         nonFungibleContract = ERC721Transfer(_nftAddress);
         require(msg.sender == ownerOffer.seller, "Not authorised");
-        uint256 valueAfterCut = afterOwnerCut(currentBid.value);
-        dai.transfer(ownerOffer.seller, valueAfterCut);
-        nonFungibleContract.transfer(address(this), currentBid.bidder, _tokenId);
+        dai.transfer(ownerOffer.seller, value);
+        nonFungibleContract.transfer(address(this), _bidder, _tokenId);
         delete artForSale[_tokenId];
         delete artBid[_tokenId];
     }
@@ -119,8 +124,7 @@ contract UnknownUniqueArtExchange {
         require (askedItem.isForSale, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
         // return amount to current bidder
-        uint256 valueAfterCut = afterOwnerCut(value);
-        dai.transferFrom(_buyer, askedItem.seller, valueAfterCut);
+        dai.transferFrom(_buyer, askedItem.seller, value);
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
         delete artForSale[_tokenId];
         delete artBid[_tokenId];
