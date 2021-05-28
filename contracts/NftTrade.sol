@@ -119,6 +119,10 @@ contract UnknownUniqueArtExchange {
         require (askedItem.isForSale, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
         // return amount to current bidder
+        Bid memory itemBid = artBid[_tokenId];
+        if (itemBid.hasbid) {
+            dai.transfer(itemBid.bidder, itemBid.value);
+        }
         uint256 valueAfterCut = afterOwnerCut(value);
         dai.transferFrom(_buyer, askedItem.seller, valueAfterCut);
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
