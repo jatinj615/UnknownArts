@@ -76,11 +76,13 @@ contract UnknownUniqueArtExchange {
         address _bidder, 
         uint256 value, 
         uint256 _tokenId,
+        uint256 nonce,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) public {
-        
+        bytes32 hash = sha256(address(this), _nftAddress, _bidder, value, _tokenId, nonce);
+        require(ecrecover(sha3("\x19Ethereum Signed Message:\n32", hash),v,r,s) == _bidder);
         Offer memory ownerOffer = artForSale[_tokenId];
         require(ownerOffer.isForSale, "NFT not for sale");
         nonFungibleContract = ERC721Transfer(_nftAddress);
