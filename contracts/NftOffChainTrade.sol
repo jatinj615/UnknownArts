@@ -70,7 +70,7 @@ contract UnknownUniqueArtExchange {
                                      msg.sender);
         nonFungibleContract.transferFrom(msg.sender, address(this), _tokenId);
     }
-
+    
     function acceptBid(
         address _nftAddress,
         address _bidder, 
@@ -81,12 +81,12 @@ contract UnknownUniqueArtExchange {
         bytes32 r,
         bytes32 s
     ) public {
-        bytes32 hash = sha256(address(this), _nftAddress, _bidder, value, _tokenId, nonce);
-        require(ecrecover(sha3("\x19Ethereum Signed Message:\n32", hash),v,r,s) == _bidder);
         Offer memory ownerOffer = artForSale[_tokenId];
+        require(msg.sender == ownerOffer.seller, "Not authorised");
+        bytes32 hash = keccak256(abi.encode(address(this), _nftAddress, _bidder, value, _tokenId, nonce));
+        require(ecrecover(sha256(abi.encode("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == _bidder);
         require(ownerOffer.isForSale, "NFT not for sale");
         nonFungibleContract = ERC721Transfer(_nftAddress);
-        require(msg.sender == ownerOffer.seller, "Not authorised");
         dai.transfer(ownerOffer.seller, value);
         nonFungibleContract.transfer(address(this), _bidder, _tokenId);
         delete artForSale[_tokenId];
