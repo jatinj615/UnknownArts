@@ -1,6 +1,6 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
-const ERC271Artifact = require('@openzeppelin/contracts/build/contracts/ERC721.json');
+const ERC721Artifact = require('@openzeppelin/contracts/build/contracts/ERC721.json');
 const IERC20Artifact = require('@openzeppelin/contracts/build/contracts/IERC20.json');
 
 async function assertRevert(promise, errorMessage = null) {
@@ -113,6 +113,29 @@ describe("UnknownUniqueArt", function(){
         await assertRevert(assetCreate, "Token with hash already created");
     })
 
+    it("should try to list asset with non token owner", async function(){
+        const forSale = true;
+        minAmount = ethers.utils.parseEther("0.01");
+        maxAmount = ethers.utils.parseEther("0.05");
+        // fetch token Id from events data
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
+        
+        // nft contract
+        nft = new ethers.Contract(nftAddress,ERC721Artifact.abi, owner);
+
+        // list asset to exchange
+        await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
+
+        const tokenList = unknownUniqueArtExchange.connect(accounts[3]).listAsset(nftAddress,
+                                                                  forSale,
+                                                                  tokenId,
+                                                                  minAmount,
+                                                                  maxAmount)
+        
+        await assertRevert(tokenList, "Not the owner of token")
+    })
+
     it("should list asset and test offer data", async function(){
         const forSale = true;
         minAmount = ethers.utils.parseEther("0.01");
@@ -122,7 +145,7 @@ describe("UnknownUniqueArt", function(){
         const tokenId = tokenLog.events[0].args.tokenId;
         
         // nft contract
-        nft = new ethers.Contract(nftAddress,ERC271Artifact.abi, owner);
+        nft = new ethers.Contract(nftAddress,ERC721Artifact.abi, owner);
 
         // list asset to exchange
         await listAsset(accounts[2], tokenId, forSale, minAmount, maxAmount);
