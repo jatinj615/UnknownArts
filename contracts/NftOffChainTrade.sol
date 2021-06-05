@@ -7,7 +7,7 @@ import {ERC721Transfer} from "./ERC721Transfer.sol";
 import {UnknownUniqueArt} from "./NftCreator.sol";
 import "hardhat/console.sol";
 
-contract UnknownUniqueArtExchange {
+contract UnknownUniqueArtOffExchange {
 
     using SafeMath for uint256;
     using Counters for Counters.Counter;
@@ -84,7 +84,7 @@ contract UnknownUniqueArtExchange {
         Offer memory ownerOffer = artForSale[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
         bytes32 hash = keccak256(abi.encode(address(this), _nftAddress, _bidder, value, _tokenId, nonce));
-        require(ecrecover(sha256(abi.encode("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == _bidder);
+        require(ecrecover(sha256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == _bidder);
         require(ownerOffer.isForSale, "NFT not for sale");
         nonFungibleContract = ERC721Transfer(_nftAddress);
         dai.transfer(ownerOffer.seller, value);
@@ -92,14 +92,24 @@ contract UnknownUniqueArtExchange {
         delete artForSale[_tokenId];
     }
 
-    function buyNow(address _buyer, uint256 value, uint256 _tokenId) public {
+    function buyNow(
+        address _nftAddress,
+        address _buyer, 
+        uint256 value, 
+        uint256 _tokenId,
+        uint256 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public {
         Offer memory askedItem = artForSale[_tokenId];
         require (askedItem.isForSale, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
+        bytes32 hash = keccak256(abi.encode(address(this), _nftAddress, askedItem.seller, value, _tokenId, nonce));
+        require(ecrecover(sha256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == askedItem.seller);
         dai.transferFrom(_buyer, askedItem.seller, value);
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
         delete artForSale[_tokenId];
     }
-
 
 }
