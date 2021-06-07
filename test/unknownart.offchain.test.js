@@ -1,8 +1,26 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
-const ERC271Artifact = require('@openzeppelin/contracts/build/contracts/ERC721.json');
+const ERC721Artifact = require('@openzeppelin/contracts/build/contracts/ERC721.json');
 const IERC20Artifact = require('@openzeppelin/contracts/build/contracts/IERC20.json');
 
+
+async function assertRevert(promise, errorMessage = null) {
+    try {
+      const tx = await promise;
+      const receipt = await ethers.provider.getTransactionReceipt(tx.tx);
+      if (receipt.gasUsed >= 6700000) {
+        return;
+      }
+    } catch (error) {
+      if (errorMessage) {
+        assert(error.message.search(errorMessage) >= 0, `Expected ${errorMessage} `);
+      }
+      const invalidOpcode = error.message.search("revert") >= 0;
+      assert(invalidOpcode, "Expected revert, got '" + error + "' instead");
+      return;
+    }
+    assert.ok(false, 'Error containing "revert" must be returned');
+}
 
 describe("UnknownUniqueArtOffExchange", function(){
 
@@ -77,12 +95,35 @@ describe("UnknownUniqueArtOffExchange", function(){
         };
     })
 
-    it("should list asset and test offer data", async function(){
+    it("should try to list asset with non token owner", async function(){
         // create asset
         tokenHash = 'unique1';
         tokenMetadata = 'https://unique1';
         token = await createAsset(accounts[2].address, tokenHash, tokenMetadata)
 
+        const forSale = true;
+        minAmount = ethers.utils.parseEther("0.01");
+        maxAmount = ethers.utils.parseEther("0.05");
+        // fetch token Id from events data
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
+        
+        // nft contract
+        nft = new ethers.Contract(nftAddress,ERC721Artifact.abi, owner);
+
+        // list asset to exchange
+        await nft.connect(accounts[2]).approve(nftExchangeAddress, tokenId);
+
+        const tokenList = unknownUniqueArtOffExchange.connect(accounts[3]).listAsset(nftAddress,
+                                                                  forSale,
+                                                                  tokenId,
+                                                                  minAmount,
+                                                                  maxAmount)
+        
+        await assertRevert(tokenList, "Not the owner of token")
+    })
+
+    it("should list asset and test offer data", async function(){
         // list asset
         const forSale = true;
         minAmount = ethers.utils.parseEther("0.01");
@@ -92,7 +133,7 @@ describe("UnknownUniqueArtOffExchange", function(){
         const tokenId = tokenLog.events[0].args.tokenId;
         
         // nft contract
-        nft = new ethers.Contract(nftAddress,ERC271Artifact.abi, owner);
+        nft = new ethers.Contract(nftAddress,ERC721Artifact.abi, owner);
 
         // list asset to exchange
         await listAsset(accounts[2], tokenId, forSale, minAmount, maxAmount);
@@ -102,27 +143,52 @@ describe("UnknownUniqueArtOffExchange", function(){
         assert.equal((await unknownUniqueArtOffExchange.assetMaxValue(tokenId)).toString(), maxAmount.toString());
     })
 
-    // it("should test signature", async function(){
-    //     // deploy NFT Exchange Contract
-    //     ownerCut = ethers.BigNumber.from("500")
-    //     const UnknownUniqueArtOffExchange = await ethers.getContractFactory("UnknownUniqueArtOffExchange");
-    //     unknownUniqueArtOffExchange = await UnknownUniqueArtOffExchange.deploy(ownerCut)
-    //     await unknownUniqueArtOffExchange.deployed();
-    //     nftExchangeAddress = unknownUniqueArtOffExchange.address;
-    //     let message = "Hello world"
+    // it("should accept bid on asset and test for new owner", async function(){
+    //     // create bidder signature
+    //     const value = ethers.utils.parseEther("0.04");
         
-    //     privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-    //     accounts = await ethers.getSigners();
-    //     hash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string"], [ "Hello world" ]))
-    //     // var wallet = new ethers.Wallet(privateKey);
-    //     var signature = await accounts[0].signMessage(ethers.utils.arrayify(hash));
-        
-    //     var sig = ethers.utils.splitSignature(signature);
-    //     console.log(sig)
-    //     console.log("Recovered:", ethers.utils.verifyMessage(ethers.utils.arrayify(hash), sig));
+    //     // fetch token Id from events data
+    //     const tokenLog = await token.wait();
+    //     const tokenId = tokenLog.events[0].args.tokenId;
 
-        // console.log(hash);
-        // console.log(accounts[0].address)
-        // await unknownUniqueArtOffExchange.connect(accounts[0]).testSign(message, sig.v, sig.r, sig.s)
-    // }) 
+    //     const messageHash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
+    //         ["address", "address", "address", "uint256", "uint256"],
+    //         [nftExchangeAddress, nftAddress, accounts[3].address, value, tokenId]
+    //     ))
+        
+    //     var signature = await accounts[3].signMessage(ethers.utils.arrayify(messageHash));
+    //     var sig = ethers.utils.splitSignature(signature);
+    //     // transfer value to contract after creating signature
+    //     await dai.connect(accounts[3]).transfer(nftExchangeAddress, value);
+
+    //     // console.log(sig)
+    //     await unknownUniqueArtOffExchange.connect(accounts[2]).acceptBid(
+    //         nftAddress, accounts[3].address, value, tokenId, sig.v, sig.r, sig.s)
+        
+    //     assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[3].address);
+    // })
+
+    it("should buy the asset and test for new owner", async function(){
+        // create bidder signature
+        const value = ethers.utils.parseEther("0.05");
+        
+        // fetch token Id from events data
+        const tokenLog = await token.wait();
+        const tokenId = tokenLog.events[0].args.tokenId;
+
+        const messageHash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
+            ["address", "address", "address", "uint256", "uint256"],
+            [nftExchangeAddress, nftAddress, accounts[2].address, value, tokenId]
+        ))
+        
+        var signature = await accounts[2].signMessage(ethers.utils.arrayify(messageHash));
+        var sig = ethers.utils.splitSignature(signature);
+        // transfer value to contract after creating signature
+        await dai.connect(accounts[3]).approve(nftExchangeAddress, value);
+
+        await unknownUniqueArtOffExchange.buyNow(
+            nftAddress, accounts[3].address, value, tokenId, sig.v, sig.r, sig.s)
+        
+        assert.equal(await unknownUniqueArt.ownerOf(tokenId), accounts[3].address);
+    })
 })

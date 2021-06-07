@@ -292,7 +292,7 @@ describe("UnknownUniqueArt", function(){
 
         // approve contract for the buy amount
         await dai.connect(accounts[4]).approve(unknownUniqueArtExchange.address, amount);
-
+        
         await unknownUniqueArtExchange.buyNow(accounts[4].address,
                                               amount,
                                               tokenId)

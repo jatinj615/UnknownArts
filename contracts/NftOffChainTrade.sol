@@ -59,6 +59,10 @@ contract UnknownUniqueArtOffExchange {
         return value.mul(ownerCut.div(10000));
     }
 
+    function afterOwnerCut(uint256 value) public view returns (uint256) {
+        return value.sub(value.mul(ownerCut.div(10000)));
+    }
+
     function listAsset(address _nftAddress,
                        bool _forSale,
                        uint256 _tokenId,
@@ -82,11 +86,13 @@ contract UnknownUniqueArtOffExchange {
     ) public {
         Offer memory ownerOffer = artForSale[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
-        bytes32 hash = keccak256(abi.encode(address(this), _nftAddress, _bidder, value, _tokenId));
-        require(ecrecover(sha256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == _bidder);
+        bytes32 messageHash = keccak256(abi.encode(address(this), _nftAddress, _bidder, value, _tokenId));
+        // console.logBytes32(ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)),v,r,s));
+        require(ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)),v,r,s) == _bidder, "Invalid signature");
         require(ownerOffer.isForSale, "NFT not for sale");
         nonFungibleContract = ERC721Transfer(_nftAddress);
-        dai.transfer(ownerOffer.seller, value);
+        uint256 valueAfterCut = afterOwnerCut(value);
+        dai.transfer(ownerOffer.seller, valueAfterCut);
         nonFungibleContract.transfer(address(this), _bidder, _tokenId);
         delete artForSale[_tokenId];
     }
@@ -103,9 +109,10 @@ contract UnknownUniqueArtOffExchange {
         Offer memory askedItem = artForSale[_tokenId];
         require (askedItem.isForSale, "NFT not for sale");
         require (askedItem.maxValue == value, "Amount not equal to maximun asking price");
-        bytes32 hash = keccak256(abi.encode(address(this), _nftAddress, askedItem.seller, value, _tokenId));
-        require(ecrecover(sha256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == askedItem.seller);
-        dai.transferFrom(_buyer, askedItem.seller, value);
+        bytes32 messageHash = keccak256(abi.encode(address(this), _nftAddress, askedItem.seller, value, _tokenId));
+        require(ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)),v,r,s) == askedItem.seller);
+        uint256 valueAfterCut = afterOwnerCut(value);
+        dai.transferFrom(_buyer, askedItem.seller, valueAfterCut);
         nonFungibleContract.transfer(address(this), _buyer, _tokenId);
         delete artForSale[_tokenId];
     }
