@@ -87,7 +87,6 @@ contract UnknownUniqueArtOffExchange {
         Offer memory ownerOffer = artForSale[_tokenId];
         require(msg.sender == ownerOffer.seller, "Not authorised");
         bytes32 messageHash = keccak256(abi.encode(address(this), _nftAddress, _bidder, value, _tokenId));
-        // console.logBytes32(ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)),v,r,s));
         require(ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)),v,r,s) == _bidder, "Invalid signature");
         require(ownerOffer.isForSale, "NFT not for sale");
         nonFungibleContract = ERC721Transfer(_nftAddress);
